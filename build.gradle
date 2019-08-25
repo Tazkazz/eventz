@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+}
+
+group 'lt.tazkazz.eventz'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'com.github.msemys:esjc:2.1.0'
+    compile 'com.google.guava:guava:28.0-jre'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.9.3'
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
