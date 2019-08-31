@@ -27,12 +27,7 @@ public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
      * @return Tzentity with ID and new version
      */
     public TzentityWithIdAndVersion<T> save(C command) {
-        T entity = newEntity();
-        UUID uuid = UUID.randomUUID();
-        List<Tzevent> events = entity.processCommand(command);
-        long newVersion = writeEvents(events, uuid, ExpectedVersion.NO_STREAM);
-        events.forEach(entity::applyEvent);
-        return new TzentityWithIdAndVersion<>(uuid, newVersion, entity);
+        return processCommand(newEntityWithIdAndVersion(), command);
     }
 
     /**
@@ -42,12 +37,22 @@ public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
      * @return Tzentity with ID and new version
      */
     public TzentityWithIdAndVersion<T> update(UUID entityId, C command) {
-        TzentityWithIdAndVersion<T> entityWithIdAndVersion = loadEntity(entityId);
+        return processCommand(loadEntity(entityId), command);
+    }
+
+    /**
+     * Process Tzcommand command and write Tzevent events
+     * @param entityWithIdAndVersion Tzentity entity with ID and version
+     * @param command Tzcommand command
+     * @return Updated Tzentity entity with ID and version
+     */
+    private TzentityWithIdAndVersion<T> processCommand(TzentityWithIdAndVersion<T> entityWithIdAndVersion, C command) {
         T entity = entityWithIdAndVersion.getEntity();
+        UUID id = entityWithIdAndVersion.getId();
         List<Tzevent> events = entity.processCommand(command);
-        long newVersion = writeEvents(events, entityId, entityWithIdAndVersion.getVersion());
+        long newVersion = writeEvents(events, id, entityWithIdAndVersion.getVersion());
         events.forEach(entity::applyEvent);
-        return new TzentityWithIdAndVersion<>(entityId, newVersion, entity);
+        return new TzentityWithIdAndVersion<>(id, newVersion, entity);
     }
 
     /**
@@ -62,7 +67,7 @@ public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
     }
 
     /**
-     * Create an new Tzentity entity
+     * Create a new Tzentity entity
      * @return Tzentity entity
      */
     private T newEntity() {
@@ -71,6 +76,14 @@ public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
         } catch (InstantiationException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Create a new Tzentity entity with ID and version
+     * @return Tzentity entity with ID and version
+     */
+    private TzentityWithIdAndVersion<T> newEntityWithIdAndVersion() {
+        return new TzentityWithIdAndVersion<>(UUID.randomUUID(), ExpectedVersion.NO_STREAM, newEntity());
     }
 
     /**
