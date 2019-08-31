@@ -12,10 +12,12 @@ import java.util.UUID;
  */
 public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
     private final Class<T> entityClass;
+    private final String entityType;
     private final EventzStore eventzStore;
 
     public Tzepository(Class<T> entityClass, EventzStore eventzStore) {
         this.entityClass = entityClass;
+        this.entityType = entityClass.getSimpleName();
         this.eventzStore = eventzStore;
     }
 
@@ -56,7 +58,7 @@ public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
      * @return Next expected version of the stream
      */
     private long writeEvents(List<Tzevent> events, UUID entityId, long expectedVersion) {
-        return eventzStore.writeEvents(getStreamId(entityId), events, expectedVersion);
+        return eventzStore.writeEvents(entityType, entityId, events, expectedVersion);
     }
 
     /**
@@ -78,17 +80,8 @@ public class Tzepository<T extends Tzentity<T, C>, C extends Tzcommand> {
      */
     private TzentityWithIdAndVersion<T> loadEntity(UUID entityId) {
         T entity = newEntity();
-        TzeventsWithVersion eventsWithVersion = eventzStore.readEvents(getStreamId(entityId));
+        TzeventsWithVersion eventsWithVersion = eventzStore.readEvents(entityType, entityId);
         eventsWithVersion.getEvents().forEach(entity::applyEvent);
         return new TzentityWithIdAndVersion<>(entityId, eventsWithVersion.getVersion(), entity);
-    }
-
-    /**
-     * Get EventStore stream ID for Tzentity entity
-     * @param entityId Tzentity entity ID
-     * @return EventStore stream ID
-     */
-    private String getStreamId(UUID entityId) {
-        return entityClass.getSimpleName() + "-" + entityId;
     }
 }

@@ -1,13 +1,37 @@
 package lt.tazkazz.eventz;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.msemys.esjc.RecordedEvent;
+
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+
+import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
+import static com.fasterxml.jackson.databind.MapperFeature.DEFAULT_VIEW_INCLUSION;
 
 /**
  * Eventz utility class
  */
 class Utilz {
     private Utilz() {}
+
+    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+        .configure(DEFAULT_VIEW_INCLUSION, false)
+        .configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    /**
+     * Get metadata for EventStore event
+     * @param event RecordedEvent event
+     * @return Tzmetadata metadata
+     */
+    static Tzmetadata getEventMetadata(RecordedEvent event) {
+        try {
+            return OBJECT_MAPPER.readValue(event.metadata, Tzmetadata.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Cannot read event metadata", e);
+        }
+    }
 
     /**
      * Invoke method on an instance by method name

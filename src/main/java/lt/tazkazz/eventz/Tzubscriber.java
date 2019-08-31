@@ -1,6 +1,5 @@
 package lt.tazkazz.eventz;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.msemys.esjc.*;
 import com.google.common.collect.ImmutableSet;
 import com.google.errorprone.annotations.ForOverride;
@@ -12,9 +11,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
-import static com.fasterxml.jackson.databind.MapperFeature.DEFAULT_VIEW_INCLUSION;
-import static lt.tazkazz.eventz.Utilz.invokeMethod;
+import static lt.tazkazz.eventz.Utilz.*;
 
 /**
  * Tzubscriber persistent subscriber for the EventStore
@@ -30,15 +27,11 @@ public abstract class Tzubscriber implements PersistentSubscriptionListener {
     private final EventzStore eventzStore;
     private final String entityType;
     private final String groupId;
-    private final ObjectMapper objectMapper;
 
     public Tzubscriber(EventzStore eventzStore, String entityType, String groupId) {
         this.eventzStore = eventzStore;
         this.entityType = entityType;
         this.groupId = groupId;
-        this.objectMapper = new ObjectMapper()
-            .configure(DEFAULT_VIEW_INCLUSION, false)
-            .configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
         subscribe();
     }
 
@@ -46,7 +39,7 @@ public abstract class Tzubscriber implements PersistentSubscriptionListener {
      * Subscribe to the EventStore
      */
     private void subscribe() {
-        eventzStore.subscribe("$ce-" + entityType, groupId, this);
+        eventzStore.subscribe(entityType, groupId, this);
     }
 
     @Override
@@ -56,9 +49,10 @@ public abstract class Tzubscriber implements PersistentSubscriptionListener {
             subscription.acknowledge(eventMessage);
             return;
         }
-        Class<? extends Tzevent> eventClass = getEventClass(event.eventType);
+        Tzmetadata metadata = getEventMetadata(event);
+        Class<? extends Tzevent> eventClass = getEventClass(metadata.eventClass);
         if (eventClass != null && event.eventStreamId.startsWith(entityType)) {
-            handleEvent(event, eventClass);
+            handleEvent(event, eventClass, metadata.entityId);
         } else {
             logUnknown(event);
         }
@@ -93,10 +87,10 @@ public abstract class Tzubscriber implements PersistentSubscriptionListener {
      * @param event RecordedEvent event
      * @param eventClass Tzevent event class
      */
-    private void handleEvent(RecordedEvent event, Class<? extends Tzevent> eventClass) {
+    private void handleEvent(RecordedEvent event, Class<? extends Tzevent> eventClass, UUID entityId) {
         try {
-            Tzevent tzevent = objectMapper.readValue(event.data, eventClass);
-            Tzenvelope tzenvelope = new Tzenvelope<>(entityType, parseEntityId(event.eventStreamId), tzevent);
+            Tzevent tzevent = OBJECT_MAPPER.readValue(event.data, eventClass);
+            Tzenvelope tzenvelope = new Tzenvelope<>(entityType, entityId, tzevent);
             logHandlingEvent(tzenvelope);
             Arrays.stream(this.getClass().getDeclaredMethods())
                 .filter(method -> isEventForThisMethod(method, eventClass))
@@ -129,15 +123,5 @@ public abstract class Tzubscriber implements PersistentSubscriptionListener {
         return method.getAnnotation(Tzhandler.class) != null &&
             method.getParameterCount() == 1 &&
             ((ParameterizedType) method.getGenericParameterTypes()[0]).getActualTypeArguments()[0] == eventClass;
-    }
-
-    /**
-     * Parse Tzentity entity ID from EventStore event stream ID
-     * @param eventStreamId EventStore event stream ID
-     * @return Tzentity entity ID
-     */
-    private UUID parseEntityId(String eventStreamId) {
-        String entityId = eventStreamId.substring(entityType.length() + 1);
-        return UUID.fromString(entityId);
     }
 }
